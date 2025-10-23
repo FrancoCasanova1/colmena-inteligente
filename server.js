@@ -96,28 +96,34 @@ async function getLatestData() {
 }
 
 // Función para obtener datos históricos
+// Este es el código JavaScript en tu archivo dentro de la carpeta 'public'
 async function fetchHistoryData() {
     try {
-        // Asumiendo que Render está vivo
-        const response = await fetch('https://colmena-inteligente.onrender.com/history');
-        const data = await response.json();
+        const url = 'https://colmena-inteligente.onrender.com/history';
+        const response = await fetch(url);
+        const data = await response.json(); // Data será un array: [] o [{...}, {...}]
 
-        // ************** ESTA ES LA CLAVE **************
+        // *****************************************************************
+        // 1. VERIFICACIÓN CRÍTICA: Manejo del array vacío
+        // *****************************************************************
         if (data.length === 0) {
-            console.log("No hay datos históricos aún.");
-            // Muestra un mensaje amigable al usuario en lugar de un error.
-            document.getElementById('chart-container').innerHTML = 'Aún no hay suficientes datos para el historial.'; 
-            return; // Detiene la función si no hay datos
+            console.log("Historial vacío. Mostrando mensaje al usuario.");
+            
+            // Reemplaza el área de la gráfica con un mensaje simple
+            document.getElementById('chart-container').innerHTML = 
+                '<p class="text-center text-muted mt-5">Aún no hay suficientes datos históricos. El ESP32 enviará el primer registro en 5 minutos.</p>'; 
+            
+            return; // Detiene la ejecución para que no intente dibujar la gráfica
         }
-        // **********************************************
-
-        // Si hay datos, procede a dibujar la gráfica
+        
+        // 2. Si hay datos, procede a dibujar la gráfica
         drawChart(data); 
 
     } catch (error) {
         console.error('Error al cargar datos históricos:', error);
-        // Muestra el mensaje de error si la conexión falla.
-        document.getElementById('history-error').innerText = 'Ocurrió un error al cargar los datos históricos';
+        // Si la conexión falla o hay otro error, muestra un mensaje de fallo
+        document.getElementById('chart-container').innerHTML = 
+            '<p class="text-center text-danger mt-5">Error: No se pudo conectar al servidor para obtener el historial.</p>';
     }
 }
 
