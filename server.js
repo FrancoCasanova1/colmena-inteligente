@@ -96,19 +96,28 @@ async function getLatestData() {
 }
 
 // Función para obtener datos históricos
-async function getHistory() {
-    const query = `
-        SELECT weight, temperature, humidity, timestamp 
-        FROM data
-        ORDER BY id DESC
-        LIMIT 24;
-    `;
+async function fetchHistoryData() {
     try {
-        const result = await dbClient.query(query);
-        return result.rows.reverse(); 
+        // Asumiendo que Render está vivo
+        const response = await fetch('https://colmena-inteligente.onrender.com/history');
+        const data = await response.json();
+
+        // ************** ESTA ES LA CLAVE **************
+        if (data.length === 0) {
+            console.log("No hay datos históricos aún.");
+            // Muestra un mensaje amigable al usuario en lugar de un error.
+            document.getElementById('chart-container').innerHTML = 'Aún no hay suficientes datos para el historial.'; 
+            return; // Detiene la función si no hay datos
+        }
+        // **********************************************
+
+        // Si hay datos, procede a dibujar la gráfica
+        drawChart(data); 
+
     } catch (error) {
-        console.error('❌ Error al obtener el histórico:', error);
-        return [];
+        console.error('Error al cargar datos históricos:', error);
+        // Muestra el mensaje de error si la conexión falla.
+        document.getElementById('history-error').innerText = 'Ocurrió un error al cargar los datos históricos';
     }
 }
 
