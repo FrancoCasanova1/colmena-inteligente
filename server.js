@@ -1,29 +1,30 @@
-// server.js COMPLETO Y CORREGIDO PARA RENDER (PostgreSQL)
+// server.js COMPLETO Y OPTIMIZADO
+// URL del Servicio: https://colmena-inteligente.onrender.com
 
-// ----------------------------------------------------
-// 1. DEPENDENCIAS E INICIALIZACIÓN
-// ----------------------------------------------------
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
-const { Client } = require('pg');
+const { Client } = require('pg'); // Cliente de PostgreSQL
 
-// ************* ¡ESTO FALTABA! *************
-const app = express(); 
-// *****************************************
+// ====================================================
+// 1. INICIALIZACIÓN DE EXPRESS Y MIDDLEWARE
+// ====================================================
 
-// Middleware
-app.use(bodyParser.json());
-// Servir archivos estáticos desde la carpeta 'public' (tu dashboard HTML/CSS/JS)
-app.use(express.static(path.join(__dirname, 'public')));
+const app = express(); // Inicializa la aplicación Express
 
+// Middleware para parsear cuerpos de solicitud JSON (necesario para el ESP32)
+app.use(bodyParser.json()); 
+// Servir archivos estáticos (HTML, CSS, JS del dashboard) desde la carpeta 'public'
+app.use(express.static(path.join(__dirname, 'public'))); 
 
-// ----------------------------------------------------
-// 2. CONEXIÓN A POSTGRESQL (RENDER)
-// ----------------------------------------------------
+// ====================================================
+// 2. CONFIGURACIÓN E INICIALIZACIÓN DE POSTGRESQL
+// ====================================================
 
+// Render inyecta la URL de conexión a la base de datos a través de esta variable de entorno
 const dbClient = new Client({
     connectionString: process.env.DATABASE_URL, 
+    // Configuración obligatoria para la conexión SSL a Render.
     ssl: { rejectUnauthorized: false } 
 });
 
@@ -40,6 +41,7 @@ async function connectAndInitializeDB() {
                 weight REAL,
                 temperature REAL,
                 humidity REAL,
+                audio INTEGER, 
                 cam_url TEXT,
                 timestamp TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
@@ -49,6 +51,7 @@ async function connectAndInitializeDB() {
 
     } catch (err) {
         console.error('❌ Error fatal al conectar o inicializar DB:', err.stack);
+        // Terminar el proceso si no se puede conectar a la DB
         process.exit(1); 
     }
 }
@@ -56,38 +59,44 @@ async function connectAndInitializeDB() {
 // Ejecutar la conexión y la inicialización de la tabla
 connectAndInitializeDB();
 
-
-// ----------------------------------------------------
+// ====================================================
 // 3. FUNCIONES DE BASE DE DATOS (CRUD)
-// ******* ESTO TAMBIÉN FALTABA Y ES REQUERIDO POR LAS RUTAS *******
-// ----------------------------------------------------
+//    Estas funciones DEBEN estar definidas antes de los Endpoints
+// ====================================================
 
 // Función para guardar los datos recibidos del ESP32
 async function saveData(data) {
-    const { weight, temperature, humidity, cam_url } = data;
+    // Incluimos 'audio' en la desestructuración
+    const { weight, temperature, humidity, audio, cam_url } = data; 
+    
+    // Usamos $1, $2, etc., para sanitización y seguridad SQL.
     const query = `
-        INSERT INTO data (weight, temperature, humidity, cam_url)
-        VALUES ($1, $2, $3, $4);
+        INSERT INTO data (weight, temperature, humidity, audio, cam_url)
+        VALUES ($1, $2, $3, $4, $5);
     `;
-    const values = [weight, temperature, humidity, cam_url];
+    // El orden en 'values' debe coincidir con el orden de las columnas en 'query'
+    const values = [weight, temperature, humidity, audio, cam_url]; 
+    
     try {
         await dbClient.query(query, values);
-        console.log(`[${new Date().toLocaleTimeString()}] Datos guardados: ${weight} kg.`);
+        console.log(`[${new Date().toLocaleTimeString()}] Datos guardados: Peso=${weight}g, Temp=${temperature}°C.`);
     } catch (error) {
         console.error('❌ Error al guardar datos en PostgreSQL:', error);
     }
 }
 
-// Función para obtener el último registro
+// Función para obtener el último registro de la base de datos
 async function getLatestData() {
     const query = `
-        SELECT weight, temperature, humidity, cam_url, timestamp
+        SELECT weight, temperature, humidity, audio, cam_url, timestamp
         FROM data
         ORDER BY id DESC
         LIMIT 1;
     `;
+    
     try {
         const result = await dbClient.query(query);
+        // Retornar el registro más reciente, o un objeto vacío para el frontend
         return result.rows[0] || {}; 
     } catch (error) {
         console.error('❌ Error al obtener los últimos datos:', error);
@@ -95,51 +104,48 @@ async function getLatestData() {
     }
 }
 
-// Función para obtener datos históricos
-// Este es el código JavaScript en tu archivo dentro de la carpeta 'public'
-async function fetchHistoryData() {
+// Función para obtener los últimos 24 registros para la gráfica de historial
+async function getHistory() {
+    const query = `
+        SELECT weight, temperature, humidity, timestamp 
+        FROM data
+        ORDER BY id DESC
+        LIMIT 24;
+    `;
+    
     try {
-        const url = 'https://colmena-inteligente.onrender.com/history';
-        const response = await fetch(url);
-        const data = await response.json(); // Data será un array: [] o [{...}, {...}]
-
-        // *****************************************************************
-        // 1. VERIFICACIÓN CRÍTICA: Manejo del array vacío
-        // *****************************************************************
-        if (data.length === 0) {
-            console.log("Historial vacío. Mostrando mensaje al usuario.");
-            
-            // Reemplaza el área de la gráfica con un mensaje simple
-            document.getElementById('chart-container').innerHTML = 
-                '<p class="text-center text-muted mt-5">Aún no hay suficientes datos históricos. El ESP32 enviará el primer registro en 5 minutos.</p>'; 
-            
-            return; // Detiene la ejecución para que no intente dibujar la gráfica
-        }
-        
-        // 2. Si hay datos, procede a dibujar la gráfica
-        drawChart(data); 
-
+        const result = await dbClient.query(query);
+        // Invertimos los datos para que el más antiguo quede primero (útil para series de tiempo)
+        return result.rows.reverse(); 
     } catch (error) {
-        console.error('Error al cargar datos históricos:', error);
-        // Si la conexión falla o hay otro error, muestra un mensaje de fallo
-        document.getElementById('chart-container').innerHTML = 
-            '<p class="text-center text-danger mt-5">Error: No se pudo conectar al servidor para obtener el historial.</p>';
+        // El error 500 se previene devolviendo un array vacío []
+        console.error('❌ Error al obtener el histórico (SQL Falló):', error);
+        return []; 
     }
 }
 
-// ----------------------------------------------------
-// 4. ENDPOINTS
-// ----------------------------------------------------
+// ====================================================
+// 4. ENDPOINTS (Rutas del Servidor)
+// ====================================================
+
+// Endpoint principal (Home Page)
+app.get('/', (req, res) => {
+    // Sirve el dashboard principal
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 
 // Endpoint para recibir los datos del ESP32 Heltec (POST)
 app.post('/data', async (req, res) => {
     const data = req.body;
-    // La comprobación de '!= null' es más segura que solo 'if (data.weight)'
-    if (data.weight != null && data.temperature != null) { 
+    
+    // Verificación de datos esenciales (Peso y Temperatura son obligatorios)
+    if (data.weight != null && data.temperature != null) {
         await saveData(data);
         res.status(200).send({ status: 'success' });
     } else {
-        res.status(400).send({ status: 'error', message: 'Faltan datos requeridos.' });
+        // Devuelve un error 400 si faltan datos
+        res.status(400).send({ status: 'error', message: 'Faltan datos requeridos (weight o temperature).' });
     }
 });
 
@@ -149,24 +155,21 @@ app.get('/latest', async (req, res) => {
     res.json(latestData);
 });
 
-// Endpoint para enviar los datos históricos (GET)
+// Endpoint para enviar los datos históricos para gráficas (GET)
 app.get('/history', async (req, res) => {
     const historyData = await getHistory();
     res.json(historyData);
 });
 
-// Endpoint de prueba/Home
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
 
-
-// ----------------------------------------------------
+// ====================================================
 // 5. INICIO DEL SERVIDOR
-// ----------------------------------------------------
+// ====================================================
 
+// Render asigna el puerto a través de la variable de entorno PORT (ej. 10000)
 const PORT = process.env.PORT || 8080; 
 
 app.listen(PORT, () => {
-    console.log(`🐝 Servidor de Colmena Inteligente corriendo en el puerto ${PORT}`);
+    // Este mensaje aparecerá en los logs de Render
+    console.log(`🐝 Servidor de Colmena Inteligente escuchando en el puerto ${PORT}`);
 });
