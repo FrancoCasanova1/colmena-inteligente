@@ -57,31 +57,52 @@ async function connectAndInitializeDB() {
 }
 
 // Ejecutar la conexión y la inicialización de la tabla
-connectAndInitializeDB();
-
-// ====================================================
-// 3. FUNCIONES DE BASE DE DATOS (CRUD)
-//    Estas funciones DEBEN estar definidas antes de los Endpoints
-// ====================================================
-
-// Función para guardar los datos recibidos del ESP32
-async function saveData(data) {
-    // Incluimos 'audio' en la desestructuración
-    const { weight, temperature, humidity, audio, cam_url } = data; 
-    
-    // Usamos $1, $2, etc., para sanitización y seguridad SQL.
-    const query = `
-        INSERT INTO data (weight, temperature, humidity, audio, cam_url)
-        VALUES ($1, $2, $3, $4, $5);
-    `;
-    // El orden en 'values' debe coincidir con el orden de las columnas en 'query'
-    const values = [weight, temperature, humidity, audio, cam_url]; 
-    
+// Asegúrate de que esta función esté DENTRO de server.js y que 'dbClient' esté definido globalmente.
+async function connectAndInitializeDB() {
     try {
-        await dbClient.query(query, values);
-        console.log(`[${new Date().toLocaleTimeString()}] Datos guardados: Peso=${weight}g, Temp=${temperature}°C.`);
-    } catch (error) {
-        console.error('❌ Error al guardar datos en PostgreSQL:', error);
+        await dbClient.connect();
+        console.log('✅ Conexión a PostgreSQL establecida.');
+
+        // 1. Crear la tabla 'data' (Si no existe)
+        const createTableQuery = `
+            CREATE TABLE IF NOT EXISTS data (
+                id SERIAL PRIMARY KEY,
+                weight REAL,
+                temperature REAL,
+                humidity REAL,
+                audio INTEGER, 
+                cam_url TEXT,
+                timestamp TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `;
+        await dbClient.query(createTableQuery);
+        console.log('✅ Tabla de datos verificada/creada.');
+
+        // 2. MIGRACIÓN: Añadir la columna 'audio' si falta (soluciona el error 42703)
+        // Usamos un bloque DO $$ para ejecutar lógica condicional en SQL.
+        const addAudioColumnQuery = `
+            DO $$ 
+            BEGIN
+                -- Verifica si la columna 'audio' NO existe en la tabla 'data'
+                IF NOT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.columns 
+                    WHERE table_name='data' AND column_name='audio'
+                ) THEN
+                    -- Si no existe, la añade
+                    ALTER TABLE data ADD COLUMN audio INTEGER;
+                    RAISE NOTICE 'Columna "audio" añadida a la tabla "data".';
+                END IF;
+            END
+            $$;
+        `;
+        await dbClient.query(addAudioColumnQuery); 
+        console.log('✅ Migración de columna "audio" comprobada.');
+
+    } catch (err) {
+        console.error('❌ Error fatal al conectar o inicializar DB:', err.stack);
+        // Terminar el proceso si no se puede conectar a la DB
+        process.exit(1); 
     }
 }
 
