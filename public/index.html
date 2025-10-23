@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colmena Inteligente - Dashboard Histórico</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #ff6600; text-align: center; }
+        .tabs { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
+        .tabs button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 14px 16px; transition: 0.3s; font-size: 17px; }
+        .tabs button:hover { background-color: #ddd; }
+        .tabs button.active { background-color: #ccc; }
+        .tabcontent { display: none; padding: 6px 12px; border-top: none; }
+        /* Estilos de las tarjetas (Se mantienen) */
+        .data-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px; }
+        .card { padding: 15px; border-radius: 6px; text-align: center; }
+        .card h2 { margin: 0; font-size: 1.2em; color: #333; }
+        .card p { font-size: 2.5em; margin: 5px 0 0; font-weight: bold; }
+        #temp-card { background-color: #ffe0b2; }
+        #humidity-card { background-color: #b3e5fc; }
+        #weight-card { background-color: #c8e6c9; }
+        #sound-card { background-color: #e1bee7; }
+        #timestamp { text-align: right; color: #777; font-size: 0.9em; margin-top: 10px; }
+        .tare-control button { background-color: #ff6600; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 10px 20px; font-size: 1em; }
+        
+        /* Estilos para gráficos e historial */
+        .chart-container { margin-bottom: 30px; border: 1px solid #eee; padding: 15px; border-radius: 6px; background: #fff; }
+        .date-selector { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; display: flex; gap: 10px; align-items: center; }
+        .date-selector label { font-weight: bold; }
+       /* --- MEDIA QUERY: Responsividad para Teléfonos Móviles --- */
+    @media (max-width: 600px) {
+        /* Fuerza a la cuadrícula de datos a apilarse en una sola columna en pantallas pequeñas */
+        .data-grid {
+            grid-template-columns: 1fr; /* Una sola columna en el móvil */
+        }
+
+        /* Ajusta el padding y el tamaño del contenedor principal */
+        .container {
+            padding: 10px;
+        }
+
+        /* Reduce el tamaño del texto para que los números grandes quepan mejor */
+        .card p {
+            font-size: 2em; 
+        }
+
+        /* Ajusta los botones de las pestañas */
+        .tabs button {
+            padding: 10px 12px;
+            font-size: 15px;
+        }
+
+        /* NUEVAS REGLAS: Ajustar el selector de fechas y textos de gráficos */
+        .date-selector {
+            flex-direction: column; /* Apila los campos de fecha verticalmente */
+            align-items: stretch;
+        }
+        
+        .date-selector label, .date-selector input, .date-selector button {
+            font-size: 0.9em; /* Reduce el tamaño de la fuente en los selectores */
+            padding: 8px;
+        }
+
+        /* La clave para Chart.js: reducir el tamaño de fuente global para los gráficos */
+        .chart-container {
+            font-size: 0.75rem; /* Esto afectará indirectamente a Chart.js */
+        }
+    }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard de Monitoreo de Colmena 🐝</h1>
+
+        <div class="tabs">
+            <button class="tablinks active" onclick="openTab(event, 'Actual')">Datos Actuales</button>
+            <button class="tablinks" onclick="openTab(event, 'Historico')">Gráficos y Historial</button>
+        </div>
+
+        <div id="Actual" class="tabcontent" style="display: block;">
+            <div class="data-grid">
+                <div class="card" id="temp-card">
+                    <h2>Temperatura</h2>
+                    <p id="temp-value">--</p>
+                </div>
+                <div class="card" id="humidity-card">
+                    <h2>Humedad</h2>
+                    <p id="humidity-value">--</p>
+                </div>
+                <div class="card" id="weight-card">
+                    <h2>Peso Neto (kg)</h2>
+                    <p id="weight-value">--</p>
+                </div>
+                <div class="card" id="sound-card">
+                    <h2>Intensidad de Sonido</h2>
+                    <p id="sound-value">--</p>
+                </div>
+            </div>
+            <p id="timestamp">Última actualización: --</p>
+
+            <div class="tare-control">
+                <button onclick="realizarTara()">Establecer Colmena Actual como CERO (Tara Persistente)</button>
+            </div>
+            
+            <h2 style="margin-top: 30px;">Vista de la Colmena (ESP32-CAM)</h2>
+            <img id="camera-feed" src="" alt="Stream de la cámara" style="width: 100%; height: auto; border: 1px solid #ccc; margin-top: 10px; display: none;">
+        </div>
+        
+        <div id="Historico" class="tabcontent">
+            <h2>Selección de Rango de Fechas</h2>
+            <div class="date-selector">
+                <label for="start_date">Desde:</label>
+                <input type="date" id="start_date" required>
+                <label for="end_date">Hasta:</label>
+                <input type="date" id="end_date" required>
+                <button onclick="fetchHistoryData()">Mostrar Gráficos</button>
+            </div>
+            
+            <h3>Estadísticas y Variación de Peso</h3>
+            <div class="chart-container">
+                <canvas id="weightChart"></canvas>
+            </div>
+            
+            <h3>Histórico de Temperatura y Humedad</h3>
+            <div class="chart-container">
+                <canvas id="tempHumidChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_IP = 'http://localhost:8080';
+        let weightChart;
+        let tempHumidChart;
+
+        // --- MANEJO DE PESTAÑAS ---
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+
+            // Si abrimos la pestaña histórica, intentar cargar los datos del día actual
+            if (tabName === 'Historico') {
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('start_date').value = today;
+                document.getElementById('end_date').value = today;
+                fetchHistoryData();
+            }
+        }
+
+        // --- DATOS ACTUALES ---
+        async function updateLatestData() {
+            try {
+                const response = await fetch(`${SERVER_IP}/api/latest`);
+                const data = await response.json();
+
+                if (Object.keys(data).length === 0) {
+                    throw new Error("No hay datos en la base de datos.");
+                }
+
+                document.getElementById('temp-value').textContent = `${data.temperatura.toFixed(1)} °C`;
+                document.getElementById('humidity-value').textContent = `${data.humedad}%`;
+                document.getElementById('weight-value').textContent = `${data.peso.toFixed(2)}`;
+                document.getElementById('sound-value').textContent = `${data.sonido_intensidad}`;
+                document.getElementById('timestamp').textContent = `Última actualización: ${data.timestamp}`;
+
+                const camFeed = document.getElementById('camera-feed');
+                if (data.cam_url) {
+                    camFeed.src = data.cam_url;
+                    camFeed.style.display = 'block';
+                } else {
+                    camFeed.style.display = 'none';
+                }
+
+            } catch (error) {
+                //console.error("Error al obtener datos actuales:", error);
+                document.getElementById('timestamp').textContent = "Error de conexión o datos vacíos.";
+            }
+            
+        }
+        
+        // --- TARA REMOTA (Se mantiene igual) ---
+        async function realizarTara() {
+            const camUrl = document.getElementById('camera-feed').src;
+            if (!camUrl) {
+                 alert('Error: Debe haber una URL de cámara reportada para obtener la IP del ESP32.');
+                 return;
+            }
+            
+            let esp32IP;
+            try {
+                const url = new URL(camUrl);
+                esp32IP = url.hostname;
+            } catch (e) {
+                alert('Error al parsear la URL de la cámara. Verifica que sea correcta.');
+                return;
+            }
+            
+            const tareUrl = `http://${esp32IP}/tare`; 
+
+            if (confirm(`¿Seguro que quieres establecer el peso actual (${esp32IP}) como CERO? El peso de la colmena se guardará permanentemente.`)) {
+                try {
+                    const response = await fetch(tareUrl); 
+                    const result = await response.text();
+                    alert('TARA REMOTA COMPLETA: ' + result + '\nReinicia el ESP32 si es necesario.');
+                    updateLatestData(); 
+                } catch (error) {
+                    alert('Error al intentar realizar la tara remota. Verifica que el ESP32 esté encendido y el código cargado.');
+                    console.error(error);
+                }
+            }
+        }
+
+        // --- DATOS HISTÓRICOS Y GRÁFICOS ---
+        async function fetchHistoryData() {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+
+            if (!startDate || !endDate) {
+                alert("Por favor, selecciona un rango de fechas.");
+                return;
+            }
+
+            try {
+                const response = await fetch(`${SERVER_IP}/api/history_range?start_date=${startDate}&end_date=${endDate}`);
+                const historyData = await response.json();
+
+                if (historyData.length === 0) {
+                    alert("No hay datos disponibles en el rango seleccionado.");
+                    clearCharts();
+                    return;
+                }
+
+                // Preparar datos para Chart.js
+                const labels = historyData.map(d => new Date(d.timestamp).toLocaleString());
+                const weightValues = historyData.map(d => d.peso);
+                const tempValues = historyData.map(d => d.temperatura);
+                const humidValues = historyData.map(d => d.humedad);
+
+                // 1. Gráfico de Peso
+                renderWeightChart(labels, weightValues);
+                
+                // 2. Gráfico de Temperatura y Humedad
+                renderTempHumidChart(labels, tempValues, humidValues);
+
+            } catch (error) {
+                console.error("Error al obtener datos históricos:", error);
+                alert("Ocurrió un error al cargar los datos históricos.");
+            }
+        }
+
+        function clearCharts() {
+            if (weightChart) weightChart.destroy();
+            if (tempHumidChart) tempHumidChart.destroy();
+        }
+
+        function renderWeightChart(labels, data) {
+            const ctx = document.getElementById('weightChart').getContext('2d');
+            if (weightChart) weightChart.destroy(); 
+            
+            weightChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Peso Neto (kg)',
+                        data: data,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: false } }
+                }
+            });
+        }
+
+        function renderTempHumidChart(labels, temp, humid) {
+            const ctx = document.getElementById('tempHumidChart').getContext('2d');
+            if (tempHumidChart) tempHumidChart.destroy(); 
+            
+            tempHumidChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Temperatura (°C)',
+                            data: temp,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            yAxisID: 'yTemp',
+                            tension: 0.1,
+                            fill: false
+                        },
+                        {
+                            label: 'Humedad (%)',
+                            data: humid,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            yAxisID: 'yHumid',
+                            tension: 0.1,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false, },
+                    stacked: false,
+                    scales: {
+                        yTemp: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Temperatura (°C)' }
+                        },
+                        yHumid: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Humedad (%)' },
+                            grid: { drawOnChartArea: false, }, // No dibujar la grilla
+                            min: 0, max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+
+        // Carga inicial y actualización de datos actuales
+        document.addEventListener('DOMContentLoaded', () => {
+            // Abre la pestaña de Datos Actuales por defecto
+            document.querySelector('.tablinks.active').click(); 
+            updateLatestData();
+            // Actualiza los datos actuales cada 10 segundos
+            setInterval(updateLatestData, 10000); 
+        });
+    </script>
+</body>
+</html>

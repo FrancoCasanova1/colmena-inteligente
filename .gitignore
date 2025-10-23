@@ -1,0 +1,11 @@
+# Dependencias de Node
+node_modules
+
+# Archivos locales
+*.log
+
+# Base de datos local (ya no la necesitamos)
+colmena.db
+
+# Archivos de Ngrok
+ngrok.exe
