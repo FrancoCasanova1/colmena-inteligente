@@ -28,6 +28,22 @@
         .chart-container { margin-bottom: 30px; border: 1px solid #eee; padding: 15px; border-radius: 6px; background: #fff; }
         .date-selector { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; display: flex; gap: 10px; align-items: center; }
         .date-selector label { font-weight: bold; }
+        /* NUEVO ESTILO PARA EL IFRAME */
+        .twitch-stream-container { 
+            position: relative; 
+            overflow: hidden; 
+            padding-top: 56.25%; /* Relación de aspecto 16:9 */
+            max-width: 100%;
+            margin-top: 15px;
+        }
+        .twitch-stream-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
         @media (max-width: 600px) {
             .data-grid { grid-template-columns: 1fr; }
             .container { padding: 10px; }
@@ -73,8 +89,18 @@
                 <button onclick="realizarTara()">Establecer Colmena Actual como CERO (Tara Persistente)</button>
             </div>
             
-            <h2 style="margin-top: 30px;">Vista de la Colmena (ESP32-CAM)</h2>
-            <img id="camera-feed" src="" alt="Stream de la cámara" style="width: 100%; height: auto; border: 1px solid #ccc; margin-top: 10px; display: none;">
+            <h2 style="margin-top: 30px;">Transmisión en Vivo de Twitch</h2>
+            
+            <div class="twitch-stream-container">
+                <iframe 
+                    src="https://player.twitch.tv/?channel=<%= channel %>&parent=<%= parent %>" 
+                    allowfullscreen="true" 
+                    scrolling="no" 
+                    referrerpolicy="no-referrer-when-downgrade">
+                </iframe>
+            </div>
+            <p style="text-align: center; font-size: 0.8em; color: #555;">Canal de Twitch: **<%= channel %>**</p>
+            
         </div>
         
         <div id="Historico" class="tabcontent">
@@ -132,41 +158,27 @@
         // --- 2. DATOS ACTUALES (/latest) ---
         async function updateLatestData() {
             try {
-                // Endpoint corregido: /latest
                 const response = await fetch(`${SERVER_URL}/latest`); 
                 const data = await response.json();
 
-                // Manejo de objeto vacío: {}
                 if (Object.keys(data).length === 0) {
                     throw new Error("No hay datos en la base de datos.");
                 }
 
-                // *****************************************************************
-                // NOMBRES DE VARIABLES CORREGIDOS (DB -> weight, temperature, audio)
-                // *****************************************************************
-                const weightKg = data.weight / 1000; // Convertir gramos a kilogramos
+                const weightKg = data.weight / 1000; 
 
                 document.getElementById('temp-value').textContent = `${data.temperature.toFixed(1)} °C`;
                 document.getElementById('humidity-value').textContent = `${data.humidity}%`;
-                document.getElementById('weight-value').textContent = `${weightKg.toFixed(2)}`; // Mostrar en kg
+                document.getElementById('weight-value').textContent = `${weightKg.toFixed(2)}`; 
                 document.getElementById('sound-value').textContent = `${data.audio}`;
                 
-                // Formatear la fecha
                 const lastUpdated = new Date(data.timestamp).toLocaleString();
                 document.getElementById('timestamp').textContent = `Última actualización: ${lastUpdated}`;
 
-                // Manejo de la Cámara
-                const camFeed = document.getElementById('camera-feed');
-                if (data.cam_url) {
-                    camFeed.src = data.cam_url;
-                    camFeed.style.display = 'block';
-                } else {
-                    camFeed.style.display = 'none';
-                }
+                // *** Lógica anterior de cámara ELIMINADA ***
 
             } catch (error) {
                 console.error("Error al obtener datos actuales:", error);
-                // Mensaje de error amigable
                 document.getElementById('timestamp').textContent = "Error de conexión o datos vacíos. (Esperando ESP32)"; 
                 document.getElementById('temp-value').textContent = '--';
                 document.getElementById('humidity-value').textContent = '--';
@@ -177,40 +189,27 @@
 
         // --- 3. DATOS HISTÓRICOS Y GRÁFICOS (/history) ---
         async function fetchHistoryData() {
-            // No usamos el rango de fechas aún, solo el endpoint /history que ya funciona
-            // const startDate = document.getElementById('start_date').value;
-            // const endDate = document.getElementById('end_date').value;
-
             try {
-                // Endpoint corregido: /history (sin query params para obtener los últimos 24)
                 const response = await fetch(`${SERVER_URL}/history`); 
                 const historyData = await response.json(); 
 
-                // Contenedor para mensajes de error o gráfico
                 const weightChartContainer = document.getElementById('chart-area-weight');
                 const tempHumidChartContainer = document.getElementById('chart-area-temp-humid');
 
-                // Manejo del array vacío
                 if (historyData.length === 0) {
                     clearCharts();
-                    weightChartContainer.innerHTML = '<p class="text-center text-muted mt-5">Aún no hay suficientes datos históricos. El ESP32 debe enviar al menos 3 registros.</p>';
+                    weightChartContainer.innerHTML = '<p class="text-center text-muted mt-5">Aún no hay suficientes datos históricos.</p>';
                     tempHumidChartContainer.innerHTML = '';
                     return;
                 }
                 
-                // Si hay datos, restaurar el canvas si fue reemplazado por un mensaje
                 if (weightChartContainer.querySelector('canvas') === null) {
                     weightChartContainer.innerHTML = '<h3>Estadísticas y Variación de Peso</h3><canvas id="weightChart"></canvas>';
                     tempHumidChartContainer.innerHTML = '<h3>Histórico de Temperatura y Humedad</h3><canvas id="tempHumidChart"></canvas>';
                 }
 
-
-                // Preparar datos para Chart.js
-                // *****************************************************************
-                // NOMBRES DE VARIABLES CORREGIDOS (DB -> weight, temperature, humidity)
-                // *****************************************************************
                 const labels = historyData.map(d => new Date(d.timestamp).toLocaleString());
-                const weightValues = historyData.map(d => d.weight / 1000); // Convertir a KG para la gráfica
+                const weightValues = historyData.map(d => d.weight / 1000); 
                 const tempValues = historyData.map(d => d.temperature);
                 const humidValues = historyData.map(d => d.humidity);
 
@@ -230,7 +229,6 @@
             if (tempHumidChart) tempHumidChart.destroy();
         }
 
-        // [Las funciones renderWeightChart y renderTempHumidChart no se modifican, ya que usan los datos preprocesados]
         function renderWeightChart(labels, data) {
             const ctx = document.getElementById('weightChart').getContext('2d');
             if (weightChart) weightChart.destroy(); 
@@ -309,25 +307,18 @@
         }
 
 
-        // --- TARA REMOTA (Manteniendo el código original del usuario) ---
-        // NOTA: Esta función sólo funcionará si tu PC está en la misma red local que el ESP32
+        // --- TARA REMOTA (SIN MODIFICACIONES MAYORES) ---
+        // NOTA: Esta función DEBERÍA seguir funcionando si el ESP32 está en la red local.
         async function realizarTara() {
-            const camUrl = document.getElementById('camera-feed').src;
-            if (!camUrl || camUrl.indexOf("http") === -1) {
-                alert('Error: No se ha recibido una URL de cámara válida para obtener la IP del ESP32.');
+            // Ya que el ESP32-CAM no se usa para el stream, la URL de la cámara ya no está.
+            // Para que la Tara funcione en tu red local, tendrás que HARDCODEAR la IP del ESP32.
+            const esp32IP = 'TU_IP_LOCAL_DEL_ESP32'; // EJ: '192.168.1.100'
+
+            if (esp32IP === 'TU_IP_LOCAL_DEL_ESP32') {
+                alert('ADVERTENCIA: Debes reemplazar "TU_IP_LOCAL_DEL_ESP32" en el código JavaScript para que la tara local funcione.');
                 return;
             }
             
-            let esp32IP;
-            try {
-                const url = new URL(camUrl);
-                esp32IP = url.hostname;
-            } catch (e) {
-                alert('Error al parsear la URL de la cámara. Verifica que sea correcta.');
-                return;
-            }
-            
-            // Intenta acceder al endpoint /tare del ESP32 local
             const tareUrl = `http://${esp32IP}/tare`; 
 
             if (confirm(`¿Seguro que quieres establecer el peso actual como CERO para la balanza en ${esp32IP}?`)) {
