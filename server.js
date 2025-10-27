@@ -1,15 +1,30 @@
-// server.js (Versión con Twitch Stream Dinámico)
+// server.js (Versión con Twitch Stream Dinámico y CORS para desarrollo local)
 
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const { Client } = require('pg'); 
+const cors = require('cors'); // <-- ¡NUEVO! Importar la librería CORS
+require('dotenv').config(); // <-- ¡NUEVO! Para leer DATABASE_URL localmente
 
 // ====================================================
 // 1. INICIALIZACIÓN DE EXPRESS Y MIDDLEWARE
 // ====================================================
 
 const app = express(); 
+
+// 1.1. Configuración de CORS para permitir localhost
+const allowedOrigins = [
+    'https://colmena-inteligente.onrender.com', // Entorno de Producción
+    'http://localhost:8080',                   // Entorno de Desarrollo
+    'http://127.0.0.1:8080'                    // Alternativa para localhost
+];
+
+app.use(cors({
+    origin: allowedOrigins,
+    methods: 'GET,POST',
+    credentials: true
+}));
 
 // Middleware para parsear cuerpos de solicitud JSON (ESP32)
 app.use(bodyParser.json()); 
@@ -47,7 +62,6 @@ async function connectAndInitializeDB() {
                 temperature REAL,
                 humidity REAL,
                 audio INTEGER, 
-                -- cam_url se ELIMINARÁ de aquí tras esta implementación
                 timestamp TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `;
@@ -95,11 +109,10 @@ connectAndInitializeDB();
 // 3. FUNCIONES DE BASE DE DATOS Y LECTURA DE STREAM
 // ====================================================
 
-// Función para guardar los datos recibidos del ESP32 (cam_url ya no se usa aquí)
+// Función para guardar los datos recibidos del ESP32 
 async function saveData(data) {
     const { weight, temperature, humidity, audio } = data; 
     
-    // NOTA: Se ha eliminado 'cam_url' de esta inserción
     const query = `
         INSERT INTO data (weight, temperature, humidity, audio)
         VALUES ($1, $2, $3, $4);
@@ -140,7 +153,7 @@ async function getTwitchChannelConfig() {
     }
 }
 
-// Función para obtener el último registro de la base de datos (cam_url eliminado de la SELECT)
+// Función para obtener el último registro de la base de datos
 async function getLatestData() {
     const query = `
         SELECT weight, temperature, humidity, audio, timestamp
@@ -180,14 +193,11 @@ async function getHistory() {
 // 4. ENDPOINTS (Rutas del Servidor)
 // ====================================================
 
-// Endpoint principal (Home Page) - AHORA USA EJS
+// Endpoint principal (Home Page) - USA EJS
 app.get('/', async (req, res) => {
     try {
         // Obtenemos la configuración del stream de la base de datos
         const videoConfig = await getTwitchChannelConfig();
-
-        // Puedes combinar esto con los últimos datos si los necesitas en la página inicial
-        // const latestData = await getLatestData(); 
         
         // Renderiza index.ejs y pasa las variables de configuración
         res.render('index', videoConfig);
@@ -203,7 +213,6 @@ app.post('/data', async (req, res) => {
     const data = req.body;
     
     if (data.weight != null && data.temperature != null) {
-        // NOTA: El ESP32 ya no necesita enviar cam_url
         await saveData(data); 
         res.status(200).send({ status: 'success' });
     } else {
@@ -213,7 +222,6 @@ app.post('/data', async (req, res) => {
 
 // Endpoint para enviar los últimos datos al dashboard (GET)
 app.get('/latest', async (req, res) => {
-    // NOTA: Este endpoint ya no devuelve cam_url. Si tu frontend lo usa, tendrás que actualizarlo.
     const latestData = await getLatestData();
     res.json(latestData);
 });

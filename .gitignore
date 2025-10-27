@@ -9,3 +9,6 @@ colmena.db
 
 # Archivos de Ngrok
 ngrok.exe
+
+# Ignorar archivos de configuración de entorno
+.env
