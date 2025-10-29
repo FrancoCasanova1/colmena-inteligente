@@ -3,345 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Colmena Inteligente - Dashboard Histórico</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-    <style>
-        /* [Se mantiene el CSS] */
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1 { color: #ff6600; text-align: center; }
-        .tabs { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
-        .tabs button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 14px 16px; transition: 0.3s; font-size: 17px; }
-        .tabs button:hover { background-color: #ddd; }
-        .tabs button.active { background-color: #ccc; }
-        .tabcontent { display: none; padding: 6px 12px; border-top: none; }
-        .data-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px; }
-        .card { padding: 15px; border-radius: 6px; text-align: center; }
-        .card h2 { margin: 0; font-size: 1.2em; color: #333; }
-        .card p { font-size: 2.5em; margin: 5px 0 0; font-weight: bold; }
-        #temp-card { background-color: #ffe0b2; }
-        #humidity-card { background-color: #b3e5fc; }
-        #weight-card { background-color: #c8e6c9; }
-        #sound-card { background-color: #e1bee7; }
-        #timestamp { text-align: right; color: #777; font-size: 0.9em; margin-top: 10px; }
-        .tare-control button { background-color: #ff6600; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 10px 20px; font-size: 1em; }
-        .chart-container { margin-bottom: 30px; border: 1px solid #eee; padding: 15px; border-radius: 6px; background: #fff; }
-        .date-selector { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; display: flex; gap: 10px; align-items: center; }
-        .date-selector label { font-weight: bold; }
-        /* NUEVO ESTILO PARA EL IFRAME */
-        .twitch-stream-container { 
-            position: relative; 
-            overflow: hidden; 
-            padding-top: 56.25%; /* Relación de aspecto 16:9 */
-            max-width: 100%;
-            margin-top: 15px;
-        }
-        .twitch-stream-container iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-        @media (max-width: 600px) {
-            .data-grid { grid-template-columns: 1fr; }
-            .container { padding: 10px; }
-            .card p { font-size: 2em; }
-            .tabs button { padding: 10px 12px; font-size: 15px; }
-            .date-selector { flex-direction: column; align-items: stretch; }
-            .date-selector label, .date-selector input, .date-selector button { font-size: 0.9em; padding: 8px; }
-            .chart-container { font-size: 0.75rem; }
-        }
-    </style>
+    <title>Dashboard de Colmena Inteligente 🐝</title>
+    
+    <link rel="stylesheet" href="/css/styles.css"> 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>Dashboard de Monitoreo de Colmena 🐝</h1>
 
-        <div class="tabs">
-            <button class="tablinks active" onclick="openTab(event, 'Actual')">Datos Actuales</button>
-            <button class="tablinks" onclick="openTab(event, 'Historico')">Gráficos y Historial</button>
-        </div>
+    <header class="dashboard-header">
+        <h1>Dashboard Colmena Inteligente 🐝</h1>
+        <p>Monitoreo en Tiempo Real y Histórico</p>
+    </header>
 
-        <div id="Actual" class="tabcontent" style="display: block;">
-            <div class="data-grid">
-                <div class="card" id="temp-card">
-                    <h2>Temperatura</h2>
-                    <p id="temp-value">--</p>
-                </div>
-                <div class="card" id="humidity-card">
-                    <h2>Humedad</h2>
-                    <p id="humidity-value">--</p>
-                </div>
-                <div class="card" id="weight-card">
-                    <h2>Peso Neto (kg)</h2>
-                    <p id="weight-value">--</p>
-                </div>
-                <div class="card" id="sound-card">
-                    <h2>Intensidad de Sonido</h2>
-                    <p id="sound-value">--</p>
-                </div>
-            </div>
-            <p id="timestamp">Última actualización: --</p>
+    <main class="dashboard-container">
 
-            <div class="tare-control">
-                <button onclick="realizarTara()">Establecer Colmena Actual como CERO (Tara Persistente)</button>
-            </div>
-            
-            <h2 style="margin-top: 30px;">Transmisión en Vivo de Twitch</h2>
-            
-            <div class="twitch-stream-container">
-                <iframe 
-                    src="https://player.twitch.tv/?channel=<%= channel %>&parent=<%= parent %>" 
-                    allowfullscreen="true" 
-                    scrolling="no" 
-                    referrerpolicy="no-referrer-when-downgrade">
-                </iframe>
-            </div>
-            <p style="text-align: center; font-size: 0.8em; color: #555;">Canal de Twitch: **<%= channel %>**</p>
-            
-        </div>
+    <section class="latest-data-block">
+        <h3>Datos más Recientes (Haga clic para ver el histórico)</h3>
         
-        <div id="Historico" class="tabcontent">
-            <h2>Selección de Rango de Fechas</h2>
-            <div class="date-selector">
-                <label for="start_date">Desde:</label>
-                <input type="date" id="start_date" required>
-                <label for="end_date">Hasta:</label>
-                <input type="date" id="end_date" required>
-                <button onclick="fetchHistoryData()">Mostrar Gráficos</button> 
-            </div>
-            
-            <div id="chart-area-weight" class="chart-container">
-                <h3>Estadísticas y Variación de Peso</h3>
-                <canvas id="weightChart"></canvas>
-            </div>
-            
-            <div id="chart-area-temp-humid" class="chart-container">
-                <h3>Histórico de Temperatura y Humedad</h3>
-                <canvas id="tempHumidChart"></canvas>
-            </div>
-        </div>
+        <div class="data-cards-grid"> 
+    
+    <div class="data-card status-card" id="card-general">
+    <p class="card-title">Histórico y Análisis</p>
+    <div class="card-status-message">
+        <h2 id="general-status-display">Ver Historial de Datos</h2>
     </div>
+    <span class="card-time">Alertas Detectadas: <span id="alert-count-summary">--</span></span>
+</div>
 
-    <script>
-        // *********************************************************************************
-        // 1. CONFIGURACIÓN DE LA URL DE RENDER (IMPORTANTE: Usar HTTPS)
-        // *********************************************************************************
-        const SERVER_URL = 'https://colmena-inteligente.onrender.com'; 
-        let weightChart;
-        let tempHumidChart;
+<div class="data-card weight-card" id="card-weight">
+    <p class="card-title">Peso</p>
+    <p class="card-value" id="weight-value">-- g</p>
+    <span class="card-time" id="weight-time">Última actualización: --:--</span>
+</div>
 
-        // --- MANEJO DE PESTAÑAS ---
-        function openTab(evt, tabName) {
-            var i, tabcontent, tablinks;
-            tabcontent = document.getElementsByClassName("tabcontent");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-            }
-            tablinks = document.getElementsByClassName("tablinks");
-            for (i = 0; i < tablinks.length; i++) {
-                tablinks[i].className = tablinks[i].className.replace(" active", "");
-            }
-            document.getElementById(tabName).style.display = "block";
-            evt.currentTarget.className += " active";
+<div class="data-card temp-card" id="card-temp">
+    <p class="card-title">Temperatura Interna</p>
+    <p class="card-value" id="temp-value">-- °C</p>
+    <span class="card-time" id="temp-time">Actualizado: --:--</span>
+</div>
 
-            if (tabName === 'Historico') {
-                const today = new Date().toISOString().split('T')[0];
-                document.getElementById('start_date').value = today;
-                document.getElementById('end_date').value = today;
-                fetchHistoryData(); // Carga el histórico al abrir la pestaña
-            }
-        }
+<div class="data-card hum-card" id="card-hum">
+    <p class="card-title">Humedad Interna</p>
+     <p class="card-value" id="hum-value">-- %</p>
+    <span class="card-time" id="hum-time">Actualizado: --:--</span>
+</div>
 
-        // --- 2. DATOS ACTUALES (/latest) ---
-        async function updateLatestData() {
-            try {
-                const response = await fetch(`${SERVER_URL}/latest`); 
-                const data = await response.json();
+<div class="data-card audio-card" id="card-audio">
+    <p class="card-title">Ruido (Nivel)</p>
+     <p class="card-value" id="audio-value">--</p>
+     <span class="card-time" id="audio-time">Actualizado: --:--</span>
+</div>
 
-                if (Object.keys(data).length === 0) {
-                    throw new Error("No hay datos en la base de datos.");
-                }
+</div>
+    </section>
 
-                const weightKg = data.weight / 1000; 
+    <section class="history-block">
+    <h2 style="margin-bottom: 20px;">Histórico de Datos y Filtros</h2>
+    
+    <button class="filter-toggle-btn" id="toggle-filter-btn">
+        ☰ Opciones de Filtrado
+    </button>
 
-                document.getElementById('temp-value').textContent = `${data.temperature.toFixed(1)} °C`;
-                document.getElementById('humidity-value').textContent = `${data.humidity}%`;
-                document.getElementById('weight-value').textContent = `${weightKg.toFixed(2)}`; 
-                document.getElementById('sound-value').textContent = `${data.audio}`;
-                
-                const lastUpdated = new Date(data.timestamp).toLocaleString();
-                document.getElementById('timestamp').textContent = `Última actualización: ${lastUpdated}`;
+    <form id="history-filter-form" class="filter-form hidden-mobile">
+        <div class="filter-group">
+            <label for="start-date">Desde Fecha:</label>
+            <input type="date" id="start-date" name="start_date" required>
+        </div>
+        <div class="filter-group">
+            <label for="end-date">Hasta Fecha:</label>
+            <input type="date" id="end-date" name="end_date" required>
+        </div>
+        <div class="filter-group">
+            <label for="start-time">Desde Hora:</label>
+            <select id="start-time" name="start_time" required></select>
+        </div>
+        <div class="filter-group">
+            <label for="end-time">Hasta Hora:</label>
+            <select id="end-time" name="end_time" required></select>
+        </div>
 
-                // *** Lógica anterior de cámara ELIMINADA ***
+        <div class="filter-buttons">
+            <button type="submit" class="btn-primary">Aplicar Filtro</button>
+            <button type="button" id="reset-filter-btn" class="btn-secondary">Reset</button>
+        </div>
+    </form>
 
-            } catch (error) {
-                console.error("Error al obtener datos actuales:", error);
-                document.getElementById('timestamp').textContent = "Error de conexión o datos vacíos. (Esperando ESP32)"; 
-                document.getElementById('temp-value').textContent = '--';
-                document.getElementById('humidity-value').textContent = '--';
-                document.getElementById('weight-value').textContent = '--';
-                document.getElementById('sound-value').textContent = '--';
-            }
-        }
+    <h3 id="chart-title">📈 Histórico General</h3>
+    
+    <div class="charts-block">
+        <div id="general-chart-container" class="chart-container visible">
+            <p>Cargando gráfico...</p> 
+        </div>
+        <div id="weight-chart-container" class="chart-container"></div>
+        <div id="temp-individual-chart-container" class="chart-container"></div>
+        <div id="hum-individual-chart-container" class="chart-container"></div>
+        <div id="audio-individual-chart-container" class="chart-container"></div>
+    </div>
+</section>
+    <section class="status-alerts-block">
+        <div class="alert-summary status-initial">
+            <h2 id="hive-status-message">Inicializando estado...</h2> 
+            <p>Última verificación: <span id="last-check-time">--:--</span></p>
+        </div>
+        <div class="alert-details">
+            <h3>Detalle de Alertas</h3>
+            <ul id="alert-list">
+                <li><span class="status-alert-icon">...</span> Cargando umbrales de alerta.</li>
+            </ul>
+        </div>
+    </section>
 
-        // --- 3. DATOS HISTÓRICOS Y GRÁFICOS (/history) ---
-        async function fetchHistoryData() {
-            try {
-                const response = await fetch(`${SERVER_URL}/history`); 
-                const historyData = await response.json(); 
+    <section class="video-block">
+        <h2>🎥 Streaming en Vivo de la Colmena (Twitch)</h2>
+        <iframe 
+            src="https://player.twitch.tv/?channel=NOMBRE_DEL_CANAL&parent=localhost" 
+            allowfullscreen="true" 
+            scrolling="no" 
+            title="Hive Stream"
+            style="border: none;">
+        </iframe>
+    </section>
 
-                const weightChartContainer = document.getElementById('chart-area-weight');
-                const tempHumidChartContainer = document.getElementById('chart-area-temp-humid');
+</main>
+    <footer class="dashboard-footer">
+        <p>&copy; <%= new Date().getFullYear() %> Monitoreo de Colmenas. Desarrollado con Node.js.</p>
+    </footer>
 
-                if (historyData.length === 0) {
-                    clearCharts();
-                    weightChartContainer.innerHTML = '<p class="text-center text-muted mt-5">Aún no hay suficientes datos históricos.</p>';
-                    tempHumidChartContainer.innerHTML = '';
-                    return;
-                }
-                
-                if (weightChartContainer.querySelector('canvas') === null) {
-                    weightChartContainer.innerHTML = '<h3>Estadísticas y Variación de Peso</h3><canvas id="weightChart"></canvas>';
-                    tempHumidChartContainer.innerHTML = '<h3>Histórico de Temperatura y Humedad</h3><canvas id="tempHumidChart"></canvas>';
-                }
-
-                const labels = historyData.map(d => new Date(d.timestamp).toLocaleString());
-                const weightValues = historyData.map(d => d.weight / 1000); 
-                const tempValues = historyData.map(d => d.temperature);
-                const humidValues = historyData.map(d => d.humidity);
-
-                renderWeightChart(labels, weightValues);
-                renderTempHumidChart(labels, tempValues, humidValues);
-
-            } catch (error) {
-                console.error("Error al obtener datos históricos:", error);
-                document.getElementById('chart-area-weight').innerHTML = 
-                    '<p class="text-center text-danger mt-5">Error: No se pudo cargar el historial. Verifique su conexión.</p>';
-                document.getElementById('chart-area-temp-humid').innerHTML = '';
-            }
-        }
-        
-        function clearCharts() {
-            if (weightChart) weightChart.destroy();
-            if (tempHumidChart) tempHumidChart.destroy();
-        }
-
-        function renderWeightChart(labels, data) {
-            const ctx = document.getElementById('weightChart').getContext('2d');
-            if (weightChart) weightChart.destroy(); 
-            
-            weightChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Peso Neto (kg)',
-                        data: data,
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        tension: 0.1,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: { y: { beginAtZero: false, title: { display: true, text: 'Peso (kg)' } } }
-                }
-            });
-        }
-
-        function renderTempHumidChart(labels, temp, humid) {
-            const ctx = document.getElementById('tempHumidChart').getContext('2d');
-            if (tempHumidChart) tempHumidChart.destroy(); 
-            
-            tempHumidChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Temperatura (°C)',
-                            data: temp,
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                            yAxisID: 'yTemp',
-                            tension: 0.1,
-                            fill: false
-                        },
-                        {
-                            label: 'Humedad (%)',
-                            data: humid,
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                            yAxisID: 'yHumid',
-                            tension: 0.1,
-                            fill: false
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    interaction: { mode: 'index', intersect: false, },
-                    stacked: false,
-                    scales: {
-                        yTemp: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: { display: true, text: 'Temperatura (°C)' }
-                        },
-                        yHumid: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: { display: true, text: 'Humedad (%)' },
-                            grid: { drawOnChartArea: false, },
-                            min: 0, max: 100
-                        }
-                    }
-                }
-            });
-        }
-
-
-        // --- TARA REMOTA (SIN MODIFICACIONES MAYORES) ---
-        // NOTA: Esta función DEBERÍA seguir funcionando si el ESP32 está en la red local.
-        async function realizarTara() {
-            // Ya que el ESP32-CAM no se usa para el stream, la URL de la cámara ya no está.
-            // Para que la Tara funcione en tu red local, tendrás que HARDCODEAR la IP del ESP32.
-            const esp32IP = 'TU_IP_LOCAL_DEL_ESP32'; // EJ: '192.168.1.100'
-
-            if (esp32IP === 'TU_IP_LOCAL_DEL_ESP32') {
-                alert('ADVERTENCIA: Debes reemplazar "TU_IP_LOCAL_DEL_ESP32" en el código JavaScript para que la tara local funcione.');
-                return;
-            }
-            
-            const tareUrl = `http://${esp32IP}/tare`; 
-
-            if (confirm(`¿Seguro que quieres establecer el peso actual como CERO para la balanza en ${esp32IP}?`)) {
-                try {
-                    const response = await fetch(tareUrl); 
-                    const result = await response.text();
-                    alert('TARA REMOTA COMPLETA: ' + result + '\nReinicia el ESP32 si es necesario.');
-                    updateLatestData(); 
-                } catch (error) {
-                    alert('Error al intentar realizar la tara remota. (El ESP32 debe estar en tu red local).');
-                    console.error(error);
-                }
-            }
-        }
-
-
-        // Carga inicial y actualización de datos actuales
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelector('.tablinks.active').click(); 
-            updateLatestData();
-            // Actualiza los datos actuales cada 10 segundos
-            setInterval(updateLatestData, 10000); 
-        });
-    </script>
+    <script src="/js/main.js" type="module"></script>
 </body>
 </html>
